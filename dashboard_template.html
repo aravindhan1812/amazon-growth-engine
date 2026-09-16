@@ -132,7 +132,9 @@ document.getElementById("warnNote").innerHTML =
   `so the only difference is the decisions. The baseline is a competent manual seller: fortnightly buy box ` +
   `checks, a monthly PPC cleanup, and lead-time-aware restocking — not a seller who never logs in.`;
 
-const f$ = n => "$" + Math.round(n).toLocaleString();
+const CUR = cfg.currency_symbol || "$";
+const LOCALE = cfg.currency === "INR" ? "en-IN" : undefined;  // lakh/crore grouping
+const f$ = n => CUR + Math.round(n).toLocaleString(LOCALE);
 const fpc = n => n == null ? "—" : (n * 100).toFixed(1) + "%";
 
 function card(label, mv, av, deltaText, cls) {
@@ -247,7 +249,7 @@ document.getElementById("skuBody").innerHTML = A.per_sku.map(s => {
     <td class="num">${f$(s.ad_spend)}</td>
     <td class="num">${fpc(s.acos)}</td>
     <td class="num">${m.stockout_days} → ${s.stockout_days}</td>
-    <td class="num">$${s.start_price.toFixed(2)} → $${s.final_price.toFixed(2)}</td>
+    <td class="num">${CUR}${s.start_price.toFixed(2)} → ${CUR}${s.final_price.toFixed(2)}</td>
   </tr>`;
 }).join("");
 

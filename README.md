@@ -41,23 +41,43 @@ A public Pages site is fine for this repo because the data is simulated. Once th
 engines are reading a real seller's numbers, do not publish the dashboard — that is
 confidential business data. Keep the repo private and share the HTML file directly.
 
-## Results (90-day simulation)
+## Results (90-day simulation, amazon.in)
 
-|                    | Manual baseline | Automated | Δ         |
-|--------------------|-----------------|-----------|-----------|
-| Revenue            | $300,207        | $322,800  | +7.5%     |
-| Ad spend           | $11,168         | $11,254   | +0.8%     |
-| **Gross profit**   | **$81,916**     | **$94,186** | **+15.0%** |
-| Profit margin      | 27.3%           | 29.2%     | +1.9 pts  |
-| Stockout SKU-days  | 69              | 23        | −46       |
-| Buy box rate       | 83.3%           | 85.4%     | +2.1 pts  |
+Configured for the Indian marketplace: bids, fees and prices in INR, and amazon.in's
+zero referral fee below ₹1,000 rather than a flat percentage.
 
-The profit gain is not bought with ad budget — spend is essentially flat. It comes from
-not stocking out, not losing the buy box, and not over-advertising thin-margin products.
+|                    | Manual baseline | Automated     | Δ          |
+|--------------------|-----------------|---------------|------------|
+| Revenue            | ₹1,05,02,842    | ₹1,10,63,572  | +5.3%      |
+| Ad spend           | ₹4,88,275       | ₹3,49,346     | −28.5%     |
+| **Gross profit**   | **₹41,72,876**  | **₹46,43,060**| **+11.3%** |
+| Profit margin      | 39.7%           | 42.0%         | +2.2 pts   |
+| ACOS               | 10.8%           | 8.0%          | −2.7 pts   |
+| Stockout SKU-days  | 101             | 54            | −47        |
+| Buy box rate       | 77.8%           | 79.8%         | +2.0 pts   |
 
-Note that automated ACOS is slightly *worse* (20.3% vs 19.8%). That is deliberate: the
-engine targets profit, and will accept a higher ACOS on a high-margin SKU where the
-economics support it. Optimising ACOS directly is a common and expensive mistake.
+The profit gain comes with **less** ad spend, not more — it is won by not stocking out,
+not losing the buy box, and not buying clicks that do not pay for themselves.
+
+### A lesson from the currency switch
+
+The first INR run made the automated side *lose* to the baseline: it spent 79% more on
+ads for less profit. Indian margins here are fatter than the US equivalents, so the
+margin-derived ACOS targets came out higher, and the engine read "comfortably under
+target" and kept raising bids.
+
+The flaw it exposed is real and not currency-specific: **average ACOS under target does
+not mean the marginal click is profitable.** Extra bid buys extra clicks, and those
+extra clicks sit further down the intent curve. Two fixes, both in `engines/ppc.py`:
+
+- raises are capped at 8% while cuts stay at 15% — overspending costs money every day
+  it persists, underbidding only costs opportunity, so the downside gets the faster lever
+- after every raise the engine records the keyword's profit contribution and rechecks a
+  week later. If the increase did not pay for itself, it reverts and stops raising that
+  keyword.
+
+Bid actions dropped from 766 to 143 and profit went up. A system that converges and then
+leaves things alone is working correctly, not idling.
 
 ## Architecture
 

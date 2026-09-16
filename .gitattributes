@@ -1,0 +1,15 @@
+# Normalise line endings.
+#
+# The files were uploaded through the GitHub web UI (LF) and checked out on Windows
+# (CRLF), which made git report every single file as fully modified - 62 insertions and
+# 62 deletions on a 62-line file, with no actual content change. This tells git to store
+# text as LF and convert on checkout, so those phantom diffs stop.
+#
+# After adding this, run once:  git add --renormalize .
+* text=auto
+
+*.py    text diff=python
+*.md    text
+*.html  text
+*.json  text
+*.bat   text eol=crlf

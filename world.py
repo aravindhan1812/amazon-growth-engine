@@ -69,18 +69,20 @@ class SKU:
 #   C  - 45-day lead time, so inventory planning actually matters
 #   D  - thin margin and high elasticity, where a flat 25% ACOS target destroys profit
 #   F  - aggressive competitor, so buy box defence matters
+#   E  - priced above Rs 1,000, so it is the one SKU paying a referral fee at all;
+#        useful for watching the engine treat it more conservatively than the rest
 CATALOG_SPEC = [
-    dict(sku_id="SKU-A", title="Kids Rain Jacket",      price=34.99, unit_cost=11.50,
+    dict(sku_id="SKU-A", title="Kids Rain Jacket",      price=899.0, unit_cost=320.0,
          elasticity=1.6, base_demand=22, listing_quality=0.72, lead_time=35, comp_mult=1.06),
-    dict(sku_id="SKU-B", title="Cotton Bath Towel Set", price=24.99, unit_cost=9.80,
+    dict(sku_id="SKU-B", title="Cotton Bath Towel Set", price=649.0, unit_cost=255.0,
          elasticity=2.1, base_demand=30, listing_quality=0.42, lead_time=28, comp_mult=1.04),
-    dict(sku_id="SKU-C", title="Dog Puzzle Feeder",     price=19.99, unit_cost=6.20,
+    dict(sku_id="SKU-C", title="Dog Puzzle Feeder",     price=549.0, unit_cost=170.0,
          elasticity=1.3, base_demand=14, listing_quality=0.80, lead_time=45, comp_mult=1.10),
-    dict(sku_id="SKU-D", title="Toddler Puzzle Set",    price=16.49, unit_cost=7.40,
+    dict(sku_id="SKU-D", title="Toddler Puzzle Set",    price=449.0, unit_cost=205.0,
          elasticity=2.4, base_demand=26, listing_quality=0.63, lead_time=30, comp_mult=1.03),
-    dict(sku_id="SKU-E", title="Memory Foam Pillow",    price=42.00, unit_cost=15.00,
+    dict(sku_id="SKU-E", title="Memory Foam Pillow",    price=1299.0, unit_cost=460.0,
          elasticity=1.1, base_demand=11, listing_quality=0.68, lead_time=40, comp_mult=1.08),
-    dict(sku_id="SKU-F", title="Reusable Snack Bags",   price=13.99, unit_cost=4.10,
+    dict(sku_id="SKU-F", title="Reusable Snack Bags",   price=349.0, unit_cost=105.0,
          elasticity=2.0, base_demand=35, listing_quality=0.58, lead_time=25, comp_mult=0.99),
 ]
 
@@ -98,7 +100,7 @@ def build_catalog() -> List[SKU]:
                 match_type="broad" if k == 0 else "exact",
                 relevance=rng.uniform(0.35, 0.95),
                 intent=rng.uniform(0.15, 0.90),
-                bid=round(rng.uniform(0.55, 1.25), 2),
+                bid=round(rng.uniform(6.0, 18.0), 2),  # Rs - typical amazon.in opening bids
             ))
         competitor_price = round(spec["price"] * spec["comp_mult"], 2)
         skus.append(SKU(
@@ -250,10 +252,12 @@ def simulate_day(sku: SKU, sku_index: int, day: int) -> Dict:
     revenue = round(units_sold * sku.price, 2)
     ad_sales = round(paid_sold * sku.price, 2)
     cogs = round(units_sold * sku.unit_cost, 2)
-    referral_fee = round(revenue * config.REFERRAL_FEE_RATE, 2)
+    # Referral fee is per-unit and price-dependent on amazon.in (zero below Rs 1,000)
+    referral_fee = round(units_sold * config.referral_fee(sku.price), 2)
     fba_fee = round(units_sold * config.FBA_FEE_PER_UNIT, 2)
+    closing_fee = round(units_sold * config.CLOSING_FEE_PER_UNIT, 2)
     storage_fee = round(sku.on_hand * config.STORAGE_FEE_PER_UNIT_DAY, 2)
-    fees = round(referral_fee + fba_fee + storage_fee, 2)
+    fees = round(referral_fee + fba_fee + closing_fee + storage_fee, 2)
     ad_spend = round(ad_spend, 2)
     gross_profit = round(revenue - cogs - fees - ad_spend, 2)
 

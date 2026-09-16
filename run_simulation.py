@@ -144,6 +144,9 @@ def main() -> None:
     output = {
         "config": {
             "days": config.SIM_DAYS,
+            "marketplace": config.MARKETPLACE,
+            "currency": config.CURRENCY,
+            "currency_symbol": "₹",
             "skus": len(automated["per_sku"]),
             "keywords_per_sku": config.KEYWORDS_PER_SKU,
             "target_margin_share": config.TARGET_MARGIN_SHARE,

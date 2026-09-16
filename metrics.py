@@ -77,10 +77,20 @@ def ewma(values: List[float], alpha: float = 0.3) -> float:
 
 def unit_margin(price: float, unit_cost: float) -> float:
     """Net profit per unit before advertising - the number that should drive ad targets."""
-    return price - unit_cost - (price * config.REFERRAL_FEE_RATE) - config.FBA_FEE_PER_UNIT
+    return (price - unit_cost - config.referral_fee(price)
+            - config.FBA_FEE_PER_UNIT - config.CLOSING_FEE_PER_UNIT)
 
 
 def min_viable_price(unit_cost: float) -> float:
-    """Lowest price that still clears the configured net margin floor."""
-    denominator = 1 - config.REFERRAL_FEE_RATE - config.MIN_NET_MARGIN_PCT
-    return round((unit_cost + config.FBA_FEE_PER_UNIT) / denominator, 2)
+    """Lowest price that still clears the configured net margin floor.
+
+    Piecewise, because amazon.in's referral fee only kicks in above Rs 1,000: solve
+    the no-referral-fee case first, and only fall back to the higher-fee formula if
+    that answer lands above the threshold anyway.
+    """
+    fixed = unit_cost + config.FBA_FEE_PER_UNIT + config.CLOSING_FEE_PER_UNIT
+    below = fixed / (1 - config.MIN_NET_MARGIN_PCT)
+    if below < config.ZERO_REFERRAL_FEE_BELOW:
+        return round(below, 2)
+    above = fixed / (1 - config.REFERRAL_FEE_RATE - config.MIN_NET_MARGIN_PCT)
+    return round(max(above, config.ZERO_REFERRAL_FEE_BELOW), 2)
