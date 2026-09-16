@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Amazon Growth Engine — MVP Results</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0e1014; --panel:#171a20; --panel2:#1d2128; --border:#2b3039;
+    --text:#e9ecf1; --muted:#98a1b0; --auto:#5b9dff; --man:#ff9f5b;
+    --good:#4cd97b; --bad:#ff6b6b; --violet:#b98bff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);padding:34px 40px 90px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  h1{font-size:23px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13.5px;margin-bottom:6px}
+  .warn{background:rgba(255,159,91,.09);border:1px solid rgba(255,159,91,.3);border-radius:10px;
+    padding:12px 16px;font-size:12.5px;color:#f0c9a5;margin:18px 0 26px;line-height:1.6}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px;margin-bottom:26px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 17px}
+  .card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+  .card .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+  .card .tag{font-size:11.5px;color:var(--muted)}
+  .card .val{font-size:17px;font-weight:600}
+  .card .val.auto{color:var(--auto)}
+  .card .delta{font-size:11.5px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border)}
+  .delta.good{color:var(--good)} .delta.bad{color:var(--bad)} .delta.flat{color:var(--muted)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:19px 22px;margin-bottom:22px}
+  .panel h2{font-size:14.5px;margin:0 0 4px}
+  .panel .desc{font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.55}
+  .chart{position:relative;height:310px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:980px){.two{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:500;position:sticky;top:0;background:var(--panel);z-index:1}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{max-height:440px;overflow-y:auto;border:1px solid var(--border);border-radius:9px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
+  .badge.ppc{background:rgba(91,157,255,.16);color:var(--auto)}
+  .badge.pricing{background:rgba(185,139,255,.16);color:var(--violet)}
+  .badge.inventory{background:rgba(76,217,123,.15);color:var(--good)}
+  .badge.listing{background:rgba(255,159,91,.16);color:var(--man)}
+  .badge.coordination{background:rgba(255,107,107,.15);color:var(--bad)}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
+  .filters button{background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+    padding:5px 13px;border-radius:20px;font-size:12px;cursor:pointer;font-family:inherit}
+  .filters button.on{background:var(--auto);border-color:var(--auto);color:#0e1014;font-weight:600}
+  footer{color:var(--muted);font-size:11.5px;line-height:1.7;margin-top:26px;
+    border-top:1px solid var(--border);padding-top:18px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+  <h1>Amazon growth engine — MVP results</h1>
+  <div class="sub">Four coordinated layers (advertising · pricing · inventory · listing) run against a simulated marketplace for 90 days.</div>
+
+  <div class="warn" id="warnNote"></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="panel">
+    <h2>Cumulative gross profit</h2>
+    <div class="desc">Revenue minus COGS, Amazon fees and ad spend. This is the number that matters — not revenue, and not ACOS.</div>
+    <div class="chart"><canvas id="profitChart"></canvas></div>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h2>Inventory position</h2>
+      <div class="desc">Total units on hand across the catalogue. Dips to the floor are stockouts — each one costs sales and decays organic rank.</div>
+      <div class="chart"><canvas id="invChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Ad efficiency (7-day rolling TACoS)</h2>
+      <div class="desc">Ad spend as a share of <em>total</em> revenue. Note the automated run accepts slightly higher ACOS where margin allows — it optimises profit, not the ACOS vanity metric.</div>
+      <div class="chart"><canvas id="tacosChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h2>Actions by layer</h2>
+      <div class="desc">What the system did across 90 days, and what the manual baseline did in the same period.</div>
+      <div class="chart"><canvas id="actionsChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Buy box ownership</h2>
+      <div class="desc">Share of SKUs holding the buy box. Losing it is the single most expensive state on Amazon: traffic still arrives and ads still spend, but conversion collapses.</div>
+      <div class="chart"><canvas id="bbChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Per-SKU outcome</h2>
+    <div class="desc">Where the difference actually came from. Watch SKU-D (thin margin) and SKU-B (weak listing) in particular.</div>
+    <div class="scroll">
+      <table id="skuTable">
+        <thead><tr>
+          <th>SKU</th><th>Product</th><th class="num">Profit (manual)</th><th class="num">Profit (auto)</th>
+          <th class="num">Δ</th><th class="num">Ad spend</th><th class="num">ACOS</th>
+          <th class="num">Stockout days</th><th class="num">Price</th>
+        </tr></thead>
+        <tbody id="skuBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Decision log</h2>
+    <div class="desc">Every automated action with the reason it fired. In production this log is what a client actually reads — and in shadow mode, it is what a human approves before anything executes.</div>
+    <div class="filters" id="filters"></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Day</th><th>Layer</th><th>SKU</th><th>Action</th><th>Change</th><th>Reason</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+
+<script>
+const DATA = __DATA_JSON__;
+const M = DATA.manual, A = DATA.automated, cfg = DATA.config;
+
+document.getElementById("warnNote").innerHTML =
+  `<b>What this is and is not.</b> The marketplace is simulated, so these numbers demonstrate that the ` +
+  `decision logic works — they are not a forecast of what it would earn on a real account. Both runs face ` +
+  `identical market conditions (same demand noise, same competitor price path, same seed per SKU per day), ` +
+  `so the only difference is the decisions. The baseline is a competent manual seller: fortnightly buy box ` +
+  `checks, a monthly PPC cleanup, and lead-time-aware restocking — not a seller who never logs in.`;
+
+const f$ = n => "$" + Math.round(n).toLocaleString();
+const fpc = n => n == null ? "—" : (n * 100).toFixed(1) + "%";
+
+function card(label, mv, av, deltaText, cls) {
+  return `<div class="card">
+    <div class="label">${label}</div>
+    <div class="row"><span class="tag">Manual</span><span class="val">${mv}</span></div>
+    <div class="row"><span class="tag">Automated</span><span class="val auto">${av}</span></div>
+    <div class="delta ${cls}">${deltaText}</div></div>`;
+}
+const pd = (a, b) => (a - b) / Math.abs(b);
+const profitDelta = pd(A.totals.gross_profit, M.totals.gross_profit);
+const revDelta = pd(A.totals.revenue, M.totals.revenue);
+const spendDelta = pd(A.totals.ad_spend, M.totals.ad_spend);
+
+document.getElementById("cards").innerHTML = [
+  card("Gross profit", f$(M.totals.gross_profit), f$(A.totals.gross_profit),
+       `${profitDelta >= 0 ? "+" : ""}${(profitDelta * 100).toFixed(1)}% profit`, profitDelta >= 0 ? "good" : "bad"),
+  card("Revenue", f$(M.totals.revenue), f$(A.totals.revenue),
+       `${revDelta >= 0 ? "+" : ""}${(revDelta * 100).toFixed(1)}%`, revDelta >= 0 ? "good" : "bad"),
+  card("Ad spend", f$(M.totals.ad_spend), f$(A.totals.ad_spend),
+       `${spendDelta >= 0 ? "+" : ""}${(spendDelta * 100).toFixed(1)}% — profit gain is not bought with budget`,
+       Math.abs(spendDelta) < 0.05 ? "flat" : (spendDelta < 0 ? "good" : "bad")),
+  card("Profit margin", fpc(M.totals.profit_margin), fpc(A.totals.profit_margin),
+       `${((A.totals.profit_margin - M.totals.profit_margin) * 100).toFixed(1)} pts`,
+       A.totals.profit_margin > M.totals.profit_margin ? "good" : "bad"),
+  card("Stockout SKU-days", M.totals.stockout_sku_days, A.totals.stockout_sku_days,
+       `${A.totals.stockout_sku_days - M.totals.stockout_sku_days} days`,
+       A.totals.stockout_sku_days < M.totals.stockout_sku_days ? "good" : "bad"),
+  card("Buy box rate", fpc(M.totals.avg_buy_box_rate), fpc(A.totals.avg_buy_box_rate),
+       `${((A.totals.avg_buy_box_rate - M.totals.avg_buy_box_rate) * 100).toFixed(1)} pts`,
+       A.totals.avg_buy_box_rate > M.totals.avg_buy_box_rate ? "good" : "bad"),
+].join("");
+
+const days = M.daily.map(d => d.day);
+const axis = (yLabel) => ({
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: "index", intersect: false },
+  scales: {
+    x: { ticks: { color: "#98a1b0", maxTicksLimit: 12 }, grid: { color: "#252a33" } },
+    y: { title: { display: !!yLabel, text: yLabel, color: "#98a1b0" },
+         ticks: { color: "#98a1b0" }, grid: { color: "#252a33" } }
+  },
+  plugins: { legend: { labels: { color: "#e9ecf1", boxWidth: 12, font: { size: 11.5 } } } }
+});
+const line = (label, data, color, dash) => ({
+  label, data, borderColor: color, backgroundColor: "transparent",
+  borderDash: dash || [], pointRadius: 0, borderWidth: 2, tension: .25
+});
+
+function cum(daily, key) { let s = 0; return daily.map(d => (s += d[key])); }
+
+new Chart(document.getElementById("profitChart"), {
+  type: "line",
+  data: { labels: days, datasets: [
+    line("Manual", cum(M.daily, "gross_profit"), "#ff9f5b"),
+    line("Automated", cum(A.daily, "gross_profit"), "#5b9dff"),
+  ]},
+  options: axis("Cumulative gross profit ($)")
+});
+
+new Chart(document.getElementById("invChart"), {
+  type: "line",
+  data: { labels: days, datasets: [
+    line("Manual", M.daily.map(d => d.on_hand), "#ff9f5b"),
+    line("Automated", A.daily.map(d => d.on_hand), "#5b9dff"),
+  ]},
+  options: axis("Units on hand")
+});
+
+new Chart(document.getElementById("tacosChart"), {
+  type: "line",
+  data: { labels: days, datasets: [
+    line("Manual", M.daily.map(d => d.rolling_tacos == null ? null : d.rolling_tacos * 100), "#ff9f5b"),
+    line("Automated", A.daily.map(d => d.rolling_tacos == null ? null : d.rolling_tacos * 100), "#5b9dff"),
+  ]},
+  options: axis("TACoS %")
+});
+
+new Chart(document.getElementById("bbChart"), {
+  type: "line",
+  data: { labels: days, datasets: [
+    line("Manual", M.daily.map(d => d.buy_box_rate * 100), "#ff9f5b"),
+    line("Automated", A.daily.map(d => d.buy_box_rate * 100), "#5b9dff"),
+  ]},
+  options: axis("% of SKUs holding buy box")
+});
+
+const manualByLayer = {};
+M.actions.forEach(a => manualByLayer[a.layer] = (manualByLayer[a.layer] || 0) + 1);
+const layers = Array.from(new Set([...Object.keys(DATA.action_counts), ...Object.keys(manualByLayer)]));
+new Chart(document.getElementById("actionsChart"), {
+  type: "bar",
+  data: { labels: layers, datasets: [
+    { label: "Manual", data: layers.map(l => manualByLayer[l] || 0), backgroundColor: "#ff9f5b" },
+    { label: "Automated", data: layers.map(l => DATA.action_counts[l] || 0), backgroundColor: "#5b9dff" },
+  ]},
+  options: { ...axis("Actions in 90 days"), scales: {
+    x: { ticks: { color: "#98a1b0" }, grid: { display: false } },
+    y: { type: "logarithmic", ticks: { color: "#98a1b0" }, grid: { color: "#252a33" } } } }
+});
+
+const mBySku = {}; M.per_sku.forEach(s => mBySku[s.sku_id] = s);
+document.getElementById("skuBody").innerHTML = A.per_sku.map(s => {
+  const m = mBySku[s.sku_id];
+  const delta = s.gross_profit - m.gross_profit;
+  const col = delta >= 0 ? "var(--good)" : "var(--bad)";
+  return `<tr>
+    <td>${s.sku_id}</td><td>${s.title}</td>
+    <td class="num">${f$(m.gross_profit)}</td>
+    <td class="num">${f$(s.gross_profit)}</td>
+    <td class="num" style="color:${col}">${delta >= 0 ? "+" : ""}${f$(delta)}</td>
+    <td class="num">${f$(s.ad_spend)}</td>
+    <td class="num">${fpc(s.acos)}</td>
+    <td class="num">${m.stockout_days} → ${s.stockout_days}</td>
+    <td class="num">$${s.start_price.toFixed(2)} → $${s.final_price.toFixed(2)}</td>
+  </tr>`;
+}).join("");
+
+const allActions = A.actions;
+let activeLayer = "all";
+const layerList = ["all", ...layers];
+document.getElementById("filters").innerHTML = layerList.map(l =>
+  `<button data-layer="${l}" class="${l === "all" ? "on" : ""}">${l}${l === "all" ? ` (${allActions.length})` : ` (${DATA.action_counts[l] || 0})`}</button>`
+).join("");
+
+function renderLog() {
+  const rows = allActions.filter(a => activeLayer === "all" || a.layer === activeLayer);
+  document.getElementById("logBody").innerHTML = rows.map(a => `
+    <tr>
+      <td>${a.day}</td>
+      <td><span class="badge ${a.layer}">${a.layer}</span></td>
+      <td>${a.sku_id}</td>
+      <td>${a.action_type.replace(/_/g, " ")}</td>
+      <td>${a.before != null && a.after != null ? (a.before.toFixed(2) + " → " + a.after.toFixed(2)) : "—"}</td>
+      <td>${a.reason}</td>
+    </tr>`).join("");
+}
+document.getElementById("filters").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  activeLayer = e.target.dataset.layer;
+  document.querySelectorAll("#filters button").forEach(b => b.classList.toggle("on", b === e.target));
+  renderLog();
+});
+renderLog();
+
+document.getElementById("footer").innerHTML =
+  `<b>Guardrails enforced every cycle:</b> bid moves capped at ${(cfg.max_bid_change_pct * 100).toFixed(0)}% ` +
+  `(verified to hold after cent-rounding), price moves capped at ${(cfg.max_price_change_pct * 100).toFixed(0)}% ` +
+  `with a hard ${(cfg.min_net_margin_pct * 100).toFixed(0)}% net-margin floor, no keyword touched below a ` +
+  `statistical-significance click threshold, and restocking targeted at ${cfg.target_days_cover} days of cover.<br><br>` +
+  `<b>Architecture:</b> the four engines read only <code>metrics.py</code> — the fields you can genuinely pull from ` +
+  `the Advertising API and SP-API. They never read the simulator's hidden state (true demand, elasticity, keyword ` +
+  `intent, listing quality), which is verified by test. Engines return <code>Action</code> objects and never mutate ` +
+  `anything directly, so the same code can run in shadow mode against a live account — logging what it would do ` +
+  `for a human to approve, before it is ever allowed to execute.`;
+</script>
+</body>
+</html>

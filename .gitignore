@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Generated artefacts - both rebuild from source in two commands:
+#   python3 run_simulation.py && python3 build_dashboard.py
+results.json
+dist/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Scratch
+.gittest*
